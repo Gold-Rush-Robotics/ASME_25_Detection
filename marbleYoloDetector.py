@@ -1,7 +1,7 @@
 import cv2
 from ultralytics import YOLO
 
-model = YOLO("grrMarbleDetector/best.pt")
+model = YOLO("best.pt")
 
 # Open the image or video
 #image = cv2.imread("geodinium.jpg")
@@ -28,7 +28,7 @@ while True:
             cv2.putText(image, f"{model.names[int(class_id)]} {conf:.2f}", (int(x1), int(y1)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
     # Display the result
-    cv2.imshow("Image", cv2.resize(image, (1380, 720)))
+    cv2.imshow("Image", image)
     # Press 'q' to exit the loop
     if cv2.waitKey(1) == ord('q'):
         break

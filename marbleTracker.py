@@ -2,7 +2,7 @@ import cv2
 from ultralytics import YOLO
 import numpy as np
 
-model = YOLO("grrMarbleDetector/best.pt")
+model = YOLO("best.pt")
 
 # Open the image or video
 #image = cv2.imread("geodinium.jpg")
@@ -23,14 +23,28 @@ class Box:
         self.center = [(x1 + x2) / 2, (y1 + y2) / 2]
 
     def __str__(self):
-        return f"Type: {self.type}, ID: {self.id}, Center: {self.center}"
+        type_word = ""
+        match (self.type):
+            case 0.0:
+                type_word = "Brass"
+            case 1.0:
+                type_word = "Nylon"
+            case 2.0:
+                type_word = "Steel"
+
+            
+        return f"{self.id}: {type_word}, Center: {self.center}"
 
 boxList = []
+LINE_CUTOFF = 150
 
 while True:
     ret, image = cam.read()
     if not ret:
         continue
+
+    #draw limit line
+    cv2.line(image, (0, LINE_CUTOFF), (640, LINE_CUTOFF), (0, 255, 0), 3)
     
     # Perform inference
     results = model.predict(image)
@@ -45,27 +59,36 @@ while True:
             thisBoxCenter = [(x1 + x2) / 2, (y1 + y2) / 2]
 
             identified = False
-            for foundBox in boxList:
-                distance = np.sqrt( pow(thisBoxCenter[0] - foundBox.center[0], 2) + pow(thisBoxCenter[1] - foundBox.center[1], 2))
+
+            #only look at most recent three marbles to compare
+            #anything older than that has probably left the machine
+            candidates = boxList[-3:]
+
+            for foundBox in candidates:
+                distance = np.sqrt(pow(thisBoxCenter[0] - foundBox.center[0], 2) + pow(thisBoxCenter[1] - foundBox.center[1], 2))
 
                 #decides if the marble is in the found list
-                if(distance < 100):
+                if(distance < 150 and type == foundBox.type):
                     identified = True
+                    foundBox.center = [float(thisBoxCenter[0]), float(thisBoxCenter[1])]
     
-            if (not identified):
+            #if the marble does not match any of the previously seen
+            if (not identified and conf > 0.85):
                 boxList.append(Box(float(x1), float(y1), float(x2), float(y2), type, conf, id=len(boxList)+1))
 
-            cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-            cv2.putText(image, f"{model.names[int(type)]} {conf:.2f}", (int(x1), int(y1)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            if (conf > 0.5):
+                cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                cv2.putText(image, f"{model.names[int(type)]} {conf:.2f}", (int(x1), int(y1)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
     # Display the result
-    cv2.imshow("Image", cv2.resize(image, (1380, 720)))
+    cv2.imshow("Image", image)
     # Press 'q' to exit the loop
     if cv2.waitKey(1) == ord('q'):
         break
 
 for box in boxList:
-    print(box)
+    if(box.center[1] < LINE_CUTOFF):
+        print(box)
 
 # Release the capture and writer objects
 cam.release()
